@@ -294,7 +294,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     <div class="fl">
       <div class="auth-err" id="auth-err"></div>
       <div class="fg"><label>Email</label><input class="fi" type="email" id="li-email" placeholder="email@kamu.com"></div>
-      <div class="fg"><label>Password</label><input class="fi" type="password" id="li-pass" placeholder="••••••••"></div>
+      <div class="fg"><label>Password</label><input class="fi" type="password" id="li-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()"></div>
       <button class="btn-prim" id="li-btn" onclick="doLogin()">Masuk</button>
     </div>
     
@@ -741,12 +741,7 @@ async function doLogout() {
   showAuthScreen();
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-  const btn = document.getElementById('li-btn');
-  const pass = document.getElementById('li-pass');
-  if(btn) btn.addEventListener('click', doLogin);
-  if(pass) pass.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
-});
+
 
 let sb = null, currentUser = null, demoMode = false;
 let projects = [], issues = [], members = [], comments = {}, deliveryLinks = {};
