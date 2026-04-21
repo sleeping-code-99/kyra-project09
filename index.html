@@ -743,11 +743,7 @@ async function doLogout() {
 
 
 
-let sb = null, currentUser = null, demoMode = false;
-let projects = [], issues = [], members = [], comments = {}, deliveryLinks = {};
-let currentProjectId = null, currentIssueId = null, prevPage = 'projects', selectedMemberColor = '#0052CC';
-let dragId = null, issueCounter = 1;
-let selectedColor = PROJECT_COLORS[0];
+// state vars declared above
 
 try {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
