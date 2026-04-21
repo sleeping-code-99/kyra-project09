@@ -24,7 +24,7 @@
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;overflow-x:hidden}
 
 /* ── AUTH ── */
-#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0747A6 0%,#0052CC 60%,#0065FF 100%)}
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0747A6 0%,#0052CC 60%,#0065FF 100%)}#auth-screen.hidden{display:none!important}
 .auth-wrap{background:var(--surface);border-radius:var(--r-lg);padding:44px 40px;width:380px;box-shadow:var(--shadow-lg)}
 .auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:32px}
 .auth-brand-icon{width:36px;height:36px;background:var(--blue);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center}
@@ -46,7 +46,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 .auth-note strong{color:var(--text)}
 
 /* ── LAYOUT ── */
-#app{display:none;min-height:100vh}
+#app{min-height:100vh}#app.hidden{display:none}
 .layout{display:flex;min-height:100vh}
 
 /* ── SIDEBAR ── */
@@ -302,7 +302,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
 </div>
 
 <!-- APP -->
-<div id="app">
+<div id="app" class="hidden">
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sb-top">
@@ -634,6 +634,7 @@ const ADMIN_EMAIL = 'kornelius@afteroffice.com';
 const PROJECT_COLORS = ['#0052CC','#36B37E','#FF5630','#FF991F','#6554C0','#00B8D9','#172B4D','#57D9A3'];
 
 let sb = null;
+let realtimeChannel = null;
 try {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, storageKey: 'pf-auth', storage: window.localStorage }
@@ -646,6 +647,41 @@ try {
   var el = document.getElementById('auth-greeting');
   if(el) el.textContent = salam + ', Afterians!';
 })();
+
+
+// ── REALTIME ──
+
+function startRealtime(){
+  if(demoMode || !sb) return;
+  realtimeChannel = sb.channel('db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, async () => {
+      const { data } = await sb.from('projects').select('*').order('created_at');
+      if(data) projects = data;
+      const active = document.querySelector('.page.active')?.id?.replace('page-','');
+      if(active === 'projects'){ renderProjects(); renderSidebar(); }
+      else renderSidebar();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' }, async () => {
+      const { data } = await sb.from('issues').select('*').order('created_at', { ascending: false });
+      if(data) issues = data;
+      const active = document.querySelector('.page.active')?.id?.replace('page-','');
+      if(active === 'board')   renderBoard();
+      if(active === 'backlog') renderBacklog();
+      if(active === 'sprint')  renderSprint();
+      renderSidebar();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, async () => {
+      const { data } = await sb.from('members').select('*').order('name');
+      if(data) members = data;
+      renderSidebar();
+    })
+    .subscribe();
+}
+
+function stopRealtime(){
+  if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
+  realtimeChannel = null;
+}
 
 // ── AUTH ──
 async function doLogin() {
@@ -671,8 +707,8 @@ async function doLogin() {
     const nav = document.getElementById('nav-admin');
     if(nav) nav.style.display = 'flex';
   }
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
   await loadData();
   await syncMember(email);
   startRealtime();
@@ -685,8 +721,8 @@ async function doLogout() {
   stopRealtime();
   if(sb) await sb.auth.signOut();
   currentUser = null;
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
 }
 
 // ── RESTORE SESSION ON PAGE LOAD ──
@@ -705,8 +741,8 @@ window.addEventListener('load', async function() {
         const nav = document.getElementById('nav-admin');
         if(nav) nav.style.display = 'flex';
       }
-      document.getElementById('auth-screen').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
+      document.getElementById('auth-screen').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
       await loadData();
       await syncMember(email);
       startRealtime();
@@ -762,6 +798,41 @@ const DEMO_MEMBERS = [
   {id:'m4',name:'Citra Dewi',email:'citra@afteroffice.com',role:'Content Creator',color:'#6554C0'},
   {id:'m5',name:'Dani Wijaya',email:'dani@afteroffice.com',role:'Marketing',color:'#FF991F'},
 ];
+
+
+// ── REALTIME ──
+
+function startRealtime(){
+  if(demoMode || !sb) return;
+  realtimeChannel = sb.channel('db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, async () => {
+      const { data } = await sb.from('projects').select('*').order('created_at');
+      if(data) projects = data;
+      const active = document.querySelector('.page.active')?.id?.replace('page-','');
+      if(active === 'projects'){ renderProjects(); renderSidebar(); }
+      else renderSidebar();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' }, async () => {
+      const { data } = await sb.from('issues').select('*').order('created_at', { ascending: false });
+      if(data) issues = data;
+      const active = document.querySelector('.page.active')?.id?.replace('page-','');
+      if(active === 'board')   renderBoard();
+      if(active === 'backlog') renderBacklog();
+      if(active === 'sprint')  renderSprint();
+      renderSidebar();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, async () => {
+      const { data } = await sb.from('members').select('*').order('name');
+      if(data) members = data;
+      renderSidebar();
+    })
+    .subscribe();
+}
+
+function stopRealtime(){
+  if(realtimeChannel && sb) sb.removeChannel(realtimeChannel);
+  realtimeChannel = null;
+}
 
 // ── AUTH ──
 
@@ -1156,6 +1227,30 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),2200);
 }
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+
+
+
+// Alias
+function openCreateModal(status) {
+  openCreateIssue(status);
+}
+
+// ── AUTO SYNC MEMBER ON LOGIN ──
+async function syncMember(email){
+  if(demoMode) return;
+  try {
+    const{data:existing}=await sb.from('members').select('id').eq('email',email).maybeSingle();
+    if(existing) return;
+    const{data:{user}}=await sb.auth.getUser();
+    const name=user?.user_metadata?.name || email.split('@')[0];
+    const{data,error}=await sb.from('members').insert([{
+      name, email, role:'Member',
+      color:PROJECT_COLORS[Math.floor(Math.random()*PROJECT_COLORS.length)]
+    }]).select().single();
+    if(!error&&data){ members.push(data); renderSidebar(); }
+  } catch(e){ console.error('syncMember error:',e); }
+}
 </script>
 </body>
 </html>
