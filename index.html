@@ -294,7 +294,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);fon
     <div class="fl">
       <div class="auth-err" id="auth-err"></div>
       <div class="fg"><label>Email</label><input class="fi" type="email" id="li-email" placeholder="email@kamu.com"></div>
-      <div class="fg"><label>Password</label><input class="fi" type="password" id="li-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()"></div>
+      <div class="fg"><label>Password</label><input class="fi" type="password" id="li-pass" placeholder="••••••••"></div>
       <button class="btn-prim" id="li-btn" onclick="doLogin()">Masuk</button>
     </div>
     
@@ -640,83 +640,14 @@ try {
   });
 } catch(e) { console.error('Supabase init:', e); }
 
-// ── INIT ON LOAD ──
-window.addEventListener('load', async function() {
-  // Show auth or app based on session
-  const session = await getValidSession();
-  if(!session) {
-    showAuthScreen();
-    return;
-  }
-  await initApp(session);
-  // Load page from hash
-  const hash = window.location.hash.replace('#','') || 'projects';
-  loadPage(hash);
-});
-
-// Hash-based navigation — each menu click changes hash → page reloads content
-window.addEventListener('hashchange', async function() {
-  const session = await getValidSession();
-  if(!session) { showAuthScreen(); return; }
-  if(!currentUser) await initApp(session);
-  const page = window.location.hash.replace('#','') || 'projects';
-  loadPage(page);
-});
-
-async function getValidSession() {
-  if(!sb) return null;
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    return (session && session.user) ? session : null;
-  } catch(e) { return null; }
-}
-
-function showAuthScreen() {
-  document.getElementById('auth-screen').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
-  // Greeting
+(function(){
   var h = new Date().getHours();
   var salam = h < 11 ? 'Selamat Pagi' : h < 15 ? 'Selamat Siang' : h < 18 ? 'Selamat Sore' : 'Selamat Malam';
   var el = document.getElementById('auth-greeting');
   if(el) el.textContent = salam + ', Afterians!';
-}
+})();
 
-async function initApp(session) {
-  currentUser = session.user;
-  const email = session.user.email;
-  const ini = email.charAt(0).toUpperCase();
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
-  document.getElementById('sb-av').textContent = ini;
-  document.getElementById('sb-email').textContent = email;
-  document.getElementById('d-user-av').textContent = ini;
-  if(email === ADMIN_EMAIL) {
-    const nav = document.getElementById('nav-admin');
-    if(nav) nav.style.display = 'flex';
-  }
-  await loadData();
-  await syncMember(email);
-  startRealtime();
-}
-
-async function loadPage(name) {
-  // Fetch fresh data then render
-  await loadData();
-  // Update active nav
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.sb-item').forEach(n => n.classList.remove('active'));
-  const page = document.getElementById('page-' + name);
-  const nav  = document.getElementById('nav-' + name);
-  if(page) page.classList.add('active');
-  if(nav)  nav.classList.add('active');
-  const crumbs = {projects:'Semua Project', board:'Board', backlog:'Backlog', sprint:'Task Overview'};
-  document.getElementById('topbar-crumb').innerHTML = crumbs[name] || name;
-  if(name === 'board')    renderBoard();
-  if(name === 'backlog')  renderBacklog();
-  if(name === 'sprint')   renderSprint();
-  if(name === 'projects') { renderProjects(); renderSidebar(); }
-}
-
+// ── AUTH ──
 async function doLogin() {
   const email = document.getElementById('li-email').value.trim();
   const pass  = document.getElementById('li-pass').value;
@@ -726,24 +657,67 @@ async function doLogin() {
   if(!email) { err.textContent = 'Email tidak boleh kosong.'; err.style.display = 'block'; return; }
   if(!pass)  { err.textContent = 'Password tidak boleh kosong.'; err.style.display = 'block'; return; }
   btn.disabled = true; btn.textContent = 'Masuk...';
+  if(!sb) { btn.disabled=false; btn.textContent='Masuk'; err.textContent='Koneksi gagal.'; err.style.display='block'; return; }
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
   btn.disabled = false; btn.textContent = 'Masuk';
   if(error) { err.textContent = error.message; err.style.display = 'block'; return; }
-  await initApp(data.session);
-  window.location.hash = 'projects';
+  // Login berhasil
+  currentUser = data.user;
+  const ini = email.charAt(0).toUpperCase();
+  document.getElementById('sb-av').textContent = ini;
+  document.getElementById('sb-email').textContent = email;
+  document.getElementById('d-user-av').textContent = ini;
+  if(email === ADMIN_EMAIL) {
+    const nav = document.getElementById('nav-admin');
+    if(nav) nav.style.display = 'flex';
+  }
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  await loadData();
+  await syncMember(email);
+  startRealtime();
+  setInterval(() => loadData(true), 15000);
+  renderAll();
+  showPage('projects', document.getElementById('nav-projects'));
 }
 
 async function doLogout() {
   stopRealtime();
   if(sb) await sb.auth.signOut();
   currentUser = null;
-  window.location.hash = '';
-  showAuthScreen();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
 }
 
+// ── RESTORE SESSION ON PAGE LOAD ──
+window.addEventListener('load', async function() {
+  if(!sb) return;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if(session && session.user) {
+      currentUser = session.user;
+      const email = session.user.email;
+      const ini = email.charAt(0).toUpperCase();
+      document.getElementById('sb-av').textContent = ini;
+      document.getElementById('sb-email').textContent = email;
+      document.getElementById('d-user-av').textContent = ini;
+      if(email === ADMIN_EMAIL) {
+        const nav = document.getElementById('nav-admin');
+        if(nav) nav.style.display = 'flex';
+      }
+      document.getElementById('auth-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      await loadData();
+      await syncMember(email);
+      startRealtime();
+      setInterval(() => loadData(true), 15000);
+      renderAll();
+      showPage('projects', document.getElementById('nav-projects'));
+    }
+  } catch(e) { console.error('Session restore:', e); }
+});
 
-
-// state vars declared above
+// state vars initialized above
 
 try {
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -1150,8 +1124,19 @@ async function createProject(){
 
 // ── NAV & UTILS ──
 function showPage(name, el) {
-  // Update hash → triggers hashchange → loadPage()
-  window.location.hash = name;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  if(page) page.classList.add('active');
+  if(el) el.classList.add('active');
+  const crumbs = {projects:'Semua Project', board:'Board', backlog:'Backlog', sprint:'Task Overview'};
+  document.getElementById('topbar-crumb').innerHTML = crumbs[name] || name;
+  if(name === 'board')    renderBoard();
+  if(name === 'backlog')  renderBacklog();
+  if(name === 'sprint')   renderSprint();
+  if(name === 'projects') { renderProjects(); renderSidebar(); }
+  // Fetch fresh data silently
+  loadData(true);
 }
 function showPageDirect(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
